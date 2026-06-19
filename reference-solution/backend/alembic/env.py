@@ -5,9 +5,9 @@ target metadata from the ORM models, so `alembic revision --autogenerate` and
 
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
 from app import models  # noqa: F401 - import so models register on Base.metadata
 from app.config import get_settings
 from app.database import Base

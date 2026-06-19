@@ -41,14 +41,17 @@ These are encoded as assertions in the backend test suite
 | 1 | Medium | **Stateless JWT can't be revoked** — `logout` is client-side; a leaked token is valid until expiry. | Accepted for the reference (60-min TTL). Production: short TTL + refresh tokens + a revocation list. Documented. |
 | 2 | Low | **Password hashing is PBKDF2**, not a memory-hard KDF. | Accepted (stdlib, no build deps). Production: bcrypt/argon2. Documented in `backend/app/security.py`. |
 | 3 | Low | **CORS allows the local dev origin** (`:5173`). | Intended for local dev; tighten `allow_origins` per environment before shipping. |
-| 4 | Info | **No rate limiting on `/auth/*`.** | Add a reverse-proxy / API-gateway rate limit (out of scope for the kit's app layer). |
+| 4 | Low | **No rate limiting on `/auth/*`.** | Add a reverse-proxy / API-gateway rate limit (out of scope for the kit's app layer). Flagged WARN by `manual-checks.sh`. |
+| 6 | Low | **Security headers absent** (X-Content-Type-Options, X-Frame-Options, HSTS, CSP, Referrer-Policy) and the `Server` header discloses the stack. | Accepted for the teaching app; add a security-headers middleware / strip `Server` at the proxy in production. Flagged WARN by `manual-checks.sh`. |
 | 5 | (exercise) | **Webhook must verify signature + be idempotent.** | Implemented in the `assets/stripe-webhook/` template; required if you enable webhooks. |
 
 ## Tooling
 
-- `bash security/manual-checks.sh` — the kit's OWASP harness (its A01/A04
-  sections target the original projects/tasks shape; the ShopKit-specific
-  checks above are encoded in the test suite instead).
+- `bash security/manual-checks.sh http://localhost:8000` — OWASP harness
+  **adapted to ShopKit** (IDOR on cart items, token/JWT integrity, injection,
+  business-logic, auth). Verified run: **18 PASS, 7 WARN, 0 FAIL** — the WARNs
+  are the accepted defence-in-depth gaps (findings 4 & 6); the script separates
+  real vulnerabilities (FAIL, exits non-zero) from accepted hardening gaps (WARN).
 - `bash security/zap-scan.sh http://localhost:8000` — OWASP ZAP baseline DAST;
   triage headers/error-verbosity findings.
 - `pip-audit` / `npm audit` (CI `security` job) — dependency CVEs.

@@ -72,11 +72,17 @@ about it.
 > change. If your auth isn't bearer-token JWT, adapt the `setup()` login step
 > (see `<kit>/docs/TECH-STACK-SWAP-GUIDE.md` if your auth scheme differs).
 
-## ✅ Checkpoint
+## ✅ Checkpoint (RUBRIC 4e)
 
-- [ ] A k6 (or Locust) scenario hits your real routes and **all declared
-      thresholds pass**.
+- [ ] **Every** scenario you keep (`smoke`, `load`, `spike`, and/or Locust)
+      targets **your** routes — none left pointing at example/deleted routes
+      (a scenario hitting dead routes 404s and "passes" by testing nothing).
+- [ ] At least one scenario's **declared thresholds pass** against your app.
 - [ ] You watched the load show up in Grafana/Jaeger.
 - [ ] You noted at least one bottleneck or confirmed there isn't one.
+
+> Delete any scenario you genuinely don't need rather than leaving it pointed at
+> routes that don't exist — see the load anti-pattern in
+> [docs/TESTING-STRATEGY.md](../docs/TESTING-STRATEGY.md).
 
 Next: **[Module 06 — Security review & pen-test](06-security-pentest.md)**.

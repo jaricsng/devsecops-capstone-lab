@@ -48,6 +48,9 @@ line-length = 100
 [tool.isort]
 profile = "black"
 line_length = 100
+# The local alembic/ migrations dir makes isort think `alembic` is first-party;
+# it's the installed package. Pin it third-party so isort and ruff agree.
+known_third_party = ["alembic"]
 
 [tool.ruff]
 line-length = 100
@@ -57,9 +60,18 @@ select = ["E", "F", "I", "W", "UP", "B"]
 # B008: FastAPI intentionally uses Depends()/Header()/Query() as default values.
 ignore = ["B008"]
 
+[tool.ruff.lint.isort]
+# Match [tool.isort] — `alembic` is the installed package, not the local dir.
+known-third-party = ["alembic"]
+
 [tool.pytest.ini_options]
-addopts = "-q"
+# Default run = unit tests only (fast, no DB). Run integration explicitly with:
+#   pytest -m integration   (needs a Postgres DATABASE_URL)
+addopts = "-q -m 'not integration'"
 testpaths = ["tests"]
+markers = [
+    "integration: tests that run against a real Postgres database",
+]
 
 [tool.coverage.run]
 source = ["app"]

@@ -72,7 +72,7 @@ rm -f /tmp/m.sql /tmp/scaffold-smoke -rf
 
 Recorded while building the reference solution against the kit.
 
-- **Date:** 2026-06-19
+- **Date:** 2026-06-19 – 2026-06-20 (testing-discipline pass added the integration/e2e/pen rows)
 - **Kit commit (`PLATFORM-KIT.md`):** `5ba906377347b86bdd41dd561d1b874dc9038cc1`
 - **Host:** macOS, Python 3.14 (deps loosened to min-version specifiers; kit
   pins 3.12 via `.tool-versions`), Node 24, Docker present.
@@ -82,14 +82,18 @@ Recorded while building the reference solution against the kit.
 | `scaffold.py` | `--app-name shopkit --cloud gcp` | ✅ produced repo; `PLATFORM-KIT.md` recorded the commit |
 | `doctor.py` (bare scaffold) | `doctor.py .` | ✅ 3 expected FAIL (no Dockerfile/health/tests) |
 | `doctor.py` (built reference) | `doctor.py .` | ✅ **0 FAIL** ("No blocking gaps found") |
-| Backend tests | `pytest --cov` | ✅ **16 passed, 89.86% coverage** (≥70 gate) |
-| Backend lint | `ruff` / `black --check` / `isort --check` | ✅ all clean |
-| Frontend | `tsc -b` / `eslint .` / `vitest run` / `vite build` | ✅ typecheck, lint, **3 tests**, build all pass |
-| Full stack | `docker compose up --build` | ✅ DB→migrate→seed(5)→uvicorn; register→cart→checkout (order $84.00) |
+| **Unit** (backend) | `pytest --cov` | ✅ **16 passed, 89.86% coverage** (≥70 gate) |
+| **Unit** (frontend) | `vitest run` | ✅ **3 passed** |
+| **Integration** (real Postgres) | `pytest -m integration` (throwaway PG container) | ✅ **3 passed** — alembic migrations applied, unique constraint + real SQL exercised; default run deselects them |
+| **E2E** (Playwright) | `npx playwright test` vs the `frontend` compose service | ✅ **2 passed** — browser drives register→add-to-cart→checkout through nginx→API→Postgres |
+| **Security** (lint/SAST) | `ruff` / `black --check` / `isort --check` | ✅ all clean (bandit/detect-secrets/pip-audit wired in pre-commit/CI) |
+| **Pen / DAST** | `security/manual-checks.sh` vs live ShopKit | ✅ **18 PASS, 7 WARN, 0 FAIL** — authz/IDOR/injection/business-logic all hold; WARNs = accepted defence-in-depth gaps |
+| Frontend gates | `tsc -b` / `eslint .` / `vite build` | ✅ typecheck, lint, build all pass |
+| Full stack | `docker compose up --build` | ✅ DB→migrate→seed(5)→uvicorn→frontend; register→cart→checkout (order $84.00) |
 | `check_migrations.py` | `unsafe.sql` / `safe.sql` | ✅ exit 1 (blocked) / exit 0 (allowed) |
 | `conftest` (governance) | passing / failing fixtures | ✅ exit 0 (1 warn) / exit 1 (2 failures) |
 | `terraform` (IaC) | — | ⏭️ not run (terraform not installed here); tfvars wired (`shopkit`) |
-| `k6` (load) | — | ⏭️ not run (k6 not installed here); `smoke.js` rewritten to ShopKit routes |
+| **Load** (k6/Locust) | syntax-validated; not executed | ⏭️ k6 not installed here, but **all** scenarios (`smoke`/`load`/`spike`/locust) rewritten to ShopKit routes + thresholds (node `--check` + `py_compile` pass) |
 | **observability overlay** | `docker compose -f … -f observability/… --profile observability up` | ✅ all 7 containers healthy (no crash-loop); Prometheus `app`+`readiness` targets **UP**; Jaeger service `shopkit` with traces; Grafana "Service Overview" + Jaeger/Prometheus datasources provisioned; **dashboard panel queries return live data** (req-rate 1.58/s, P95 ≈ 9 ms, per-route series) |
 | metric-name mismatch | observed both names against live Prometheus | ✅ confirmed real (app default emitted old `http_server_duration_milliseconds`; dashboard queried new name → 0 series) **and resolved** in the reference toward the stable name (`OTEL_SEMCONV_STABILITY_OPT_IN=http` + reconciled `recording_rules.yml`); see `reference-solution/observability/METRIC-NAME-DECISION.md` |
 

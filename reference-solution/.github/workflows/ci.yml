@@ -72,14 +72,21 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
-      - name: Run tests with coverage
+      - name: Run unit tests with coverage
         run: pytest --cov=app --cov-report=xml --cov-fail-under=70
         env:
-          # Sync SQLAlchemy + psycopg (this service isn't async). Tests use a
-          # SQLite override anyway, but the app builds its engine from this.
+          # Sync SQLAlchemy + psycopg (this service isn't async). Unit tests use
+          # a SQLite override; the app still builds its engine from this.
           DATABASE_URL: postgresql+psycopg://appuser:apppass@localhost:5432/appdb
           SECRET_KEY: ci-test-secret-key-at-least-32-bytes-long
           ENVIRONMENT: test
+          OTEL_ENABLED: "false"
+
+      - name: Run integration tests (real Postgres)
+        run: pytest -m integration
+        env:
+          DATABASE_URL: postgresql+psycopg://appuser:apppass@localhost:5432/appdb
+          SECRET_KEY: ci-test-secret-key-at-least-32-bytes-long
           OTEL_ENABLED: "false"
 
       - name: Upload coverage report

@@ -71,7 +71,26 @@ Wire your real routes with tests as you go. Keep `/health` cheap (liveness) and
 `/ready` meaningful (e.g. check the DB connection) — Module 04's dashboards and
 every deploy job's post-check depend on the difference.
 
-## Step 4 — Frontend (golden-path stack)
+## Step 4 — Unit tests + a real integration test
+
+This module owns the bottom two layers of the test pyramid (see
+[docs/TESTING-STRATEGY.md](../docs/TESTING-STRATEGY.md)). Both are required
+([RUBRIC](../RUBRIC.md) 4a/4b):
+
+- **Unit tests** — fast, isolated, *many*. Cover each route's logic (happy path +
+  the error/authz paths). Enforce a **coverage gate** so it can't silently rot
+  (the reference uses `pytest --cov-fail-under=70`).
+- **Integration test** — at least one test against the **real database**
+  (Postgres), running your migrations and real queries. This is the layer most
+  people fake with SQLite/mocks — and faking it means migrations, constraints,
+  and dialect-specific SQL are never tested. Don't fake it.
+
+The reference shows the pattern: unit tests use an in-memory override for speed
+(`backend/tests/test_*.py`), and a separate **`backend/tests/integration/`** test
+marked `@pytest.mark.integration` runs against a real Postgres
+(`docker compose up -d db`, then `pytest -m integration`). Copy that split.
+
+## Step 5 — Frontend (golden-path stack)
 
 If you're doing a UI, build it now (React/TypeScript in the reference: light
 theme, a navbar, a dashboard landing page, plus the auth/catalog/cart/checkout
@@ -110,7 +129,9 @@ and k6 in Module 05. Frontend build/lint must be clean for Module 03's CI.
 - [ ] `python3 tools/doctor.py .` reports **0 FAIL** (WARNs on OTel/catalog are OK).
 - [ ] `docker compose up -d` boots; `curl -sf localhost:8000/health` and
       `/ready` both return 200.
-- [ ] Your test command passes (e.g. `pytest`).
+- [ ] **Unit tests pass with a coverage gate** (RUBRIC 4a) — e.g. `pytest --cov-fail-under=70`.
+- [ ] **At least one integration test passes against real Postgres** (RUBRIC 4b) —
+      e.g. `pytest -m integration` with a Postgres container up. Not SQLite/mocks.
 - [ ] At least the core feature set for your domain works end-to-end locally.
 
 Next: **[Module 03 — Shift-left security & CI](03-shiftleft-ci.md)**.

@@ -48,6 +48,32 @@ Makefile, ensuring the Dockerfile builds in CI, and making the smoke job's
 > block is a deliberate choice you can make later. Likewise the deploy jobs in
 > `publish.yml` carry `if: false` on purpose — don't remove it until Module 07.
 
+## Step 4 — Security tests in the pipeline (RUBRIC 4d)
+
+The `security` job runs the cross-cutting security tests — **SAST** (bandit),
+**secret scan** (detect-secrets, also a pre-commit hook), and **dependency
+audit** (pip-audit + npm audit). These must run and pass. Confirm your manifests
+are clean (no high-severity CVEs, no flagged code patterns); fix or justify
+anything they raise. (`publish.yml` adds Trivy image scanning + SBOM later.)
+
+## Step 5 — End-to-end tests (RUBRIC 4c)
+
+`ci.yml` ships an **`e2e` (Playwright)** job that boots the whole stack and drives
+a real browser through a user journey. A job is not a test — you must **write the
+e2e tests and make the stack reachable**:
+
+- Add a browser test suite (Playwright in the reference: `frontend/e2e/*.spec.ts`,
+  an `e2e` npm script, `playwright.config.ts`).
+- The e2e job does `docker compose up` and waits for the **frontend** at `:5173` —
+  so your `docker-compose.yml` must actually start a frontend service (the
+  reference adds one). A common gotcha: the e2e job exists but the compose file
+  has no frontend → it waits forever. Don't ship that.
+- Cover at least one full journey: e.g. load home → browse catalog → (register →
+  add to cart). Run locally first: `npx playwright test`.
+
+Backend-only capstones: substitute an API-level e2e (drive the full deployed
+stack via HTTP through every step of one real journey) and say so in your report.
+
 > ### 🤖 Claude Code track
 > - `/check-python` and `/check-frontend` — run the kit's lint/type gates and
 >   fix what they report (`/fix-python`, `/fix-frontend` apply safe fixes).
@@ -73,6 +99,11 @@ Makefile, ensuring the Dockerfile builds in CI, and making the smoke job's
 - [ ] `pre-commit run --all-files` passes; you watched the secret scanner block
       a planted credential.
 - [ ] `.secrets.baseline` is committed and current.
-- [ ] CI is **green** on your branch (lint, test, build, smoke all pass).
+- [ ] **Security tests pass** (RUBRIC 4d): bandit (SAST), detect-secrets, and
+      pip-audit/npm audit run clean in pre-commit/CI.
+- [ ] **E2E tests exist and pass** (RUBRIC 4c): `npm run e2e` (Playwright) drives
+      a real journey; your `docker-compose.yml` starts a reachable frontend.
+- [ ] CI is **green** on your branch (lint, unit+integration, security, e2e,
+      build, smoke all pass).
 
 Next: **[Module 04 — Observability](04-observability.md)**.

@@ -3,10 +3,12 @@
 # The observability overlay layers on top of THIS file (it needs a service
 # named "app" on :8000 — see observability/docker-compose.observability.yml):
 #
-#   docker compose up -d                       # app + db
+#   docker compose up -d                       # app + db + frontend
 #   make obs-up                                # + Jaeger/Prometheus/Grafana
 #
-# On boot the app runs migrations, seeds the catalog, then serves.
+# On boot the app runs migrations, seeds the catalog, then serves. The frontend
+# (nginx, :5173) serves the built SPA and proxies /api -> app:8000 — this is
+# what the CI `e2e` (Playwright) job points its browser at.
 
 services:
   app:
@@ -33,6 +35,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"   # nginx serves the SPA; matches the e2e job's wait on :5173
+    depends_on:
+      - app
 
   db:
     image: postgres:16-alpine

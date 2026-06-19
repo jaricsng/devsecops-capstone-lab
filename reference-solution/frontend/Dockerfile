@@ -3,6 +3,9 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
+# The @playwright/test devDep is only for the e2e job, not the SPA build — skip
+# its browser download so the image build stays lean.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci
 COPY . .
 # Bake the API base at build time if provided (defaults to /api via the proxy).

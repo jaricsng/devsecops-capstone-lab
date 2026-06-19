@@ -11,7 +11,6 @@ the start (see Module 07's expand/contract story).
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision: str = "0001_initial"

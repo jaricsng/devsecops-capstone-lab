@@ -16,7 +16,7 @@ repo root unless noted.
 | 1 | **Scaffolded from the kit** | `PLATFORM-KIT.md` exists and records a kit commit SHA | [01](modules/01-scaffold.md) |
 | 2 | **Containerized** | `docker compose up -d` boots; a `Dockerfile` exists | [02](modules/02-build-app.md) |
 | 3 | **Health/readiness** | `curl -sf localhost:8000/health` and `/ready` both return 200 | [02](modules/02-build-app.md) |
-| 4 | **Tests exist & pass** | the project's test command exits 0 (e.g. `pytest`, `npm test`) | [02](modules/02-build-app.md) |
+| 4 | **Testing discipline (all 6 types)** | Unit + integration + e2e + security + load + pen all present & passing — see the **Testing discipline** table below | [02](modules/02-build-app.md)–[06](modules/06-security-pentest.md) |
 | 5 | **Readiness gate green** | `python3 <kit>/tools/doctor.py .` reports **0 FAIL** | [02](modules/02-build-app.md) |
 | 6 | **Shift-left hooks** | `pre-commit run --all-files` passes; `.secrets.baseline` present | [03](modules/03-shiftleft-ci.md) |
 | 7 | **CI green** | the GitHub Actions CI run on your branch is green | [03](modules/03-shiftleft-ci.md) |
@@ -30,6 +30,27 @@ repo root unless noted.
 | 15 | **Day-2 readiness** | a runbook adapted to your service; a release decoupled from deploy via a feature flag | [08](modules/08-day2-ops.md) |
 | 16 | **Stack writeup** | `STACK-CHOICES.md` documents your stack and **one swap you evaluated** (cite the kit's `TECH-STACK-SWAP-GUIDE.md`) | all |
 | 17 | **In sync & submitted** | `sync_check.py` output captured; completion report maps every checkpoint | [10](modules/10-sync-and-submit.md) |
+
+## Testing discipline (item 4 — all six required)
+
+The heart of the capstone's quality habit: every layer of confidence has its own
+test type, mapped to a lifecycle stage. See [docs/TESTING-STRATEGY.md](docs/TESTING-STRATEGY.md)
+for the why. Build **all six for your own app** — the ShopKit reference shows a
+minimal example of each to copy.
+
+| # | Test type | Objective signal (run it; this must hold) | Module |
+|---|-----------|-------------------------------------------|--------|
+| 4a | **Unit** | Test runner exits 0 **and a coverage gate is enforced** (e.g. `pytest --cov-fail-under=70`, vitest) | [02](modules/02-build-app.md) |
+| 4b | **Integration** | At least one test runs against the **real database** (Postgres), exercising migrations + real queries — **not** SQLite/mocks (`pytest -m integration`) | [02](modules/02-build-app.md) |
+| 4c | **E2E** | A browser test (Playwright/Cypress) drives the running stack+UI through a real journey and passes (`npm run e2e`); the CI `e2e` job has a reachable app | [03](modules/03-shiftleft-ci.md) |
+| 4d | **Security** | SAST (bandit) + secret scan (detect-secrets) + dependency audit (pip-audit/npm audit) run and pass in pre-commit/CI | [03](modules/03-shiftleft-ci.md) |
+| 4e | **Load** | **Every** scenario (`smoke`/`load`/`spike`) targets *your* routes and its declared thresholds pass — no scenario hitting dead/example routes | [05](modules/05-load-testing.md) |
+| 4f | **Pen / DAST** | Authz/IDOR checks + a ZAP baseline run against *your* endpoints; results in `SECURITY-FINDINGS.md` | [06](modules/06-security-pentest.md) |
+
+> Common failure modes that **do not** pass: an "integration" test on SQLite; a
+> green e2e *job* with no e2e *tests*; load scripts pointed at routes you deleted;
+> a documented-but-never-run security check. (See the anti-patterns in
+> [TESTING-STRATEGY.md](docs/TESTING-STRATEGY.md).)
 
 ## Team Track (required for teams; optional for solo)
 

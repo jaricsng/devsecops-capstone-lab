@@ -1,232 +1,125 @@
 /**
- * k6 load test — ramp to 50 virtual users, hold for 5 minutes.
+ * k6 load test — ramp to 50 virtual users, hold for 5 minutes — for ShopKit.
  *
- * Purpose: verify the API meets performance SLOs under expected production load.
- * Thresholds define the pass/fail gate — CI can run this as a quality gate.
+ * Verifies the storefront meets performance SLOs under expected load. Thresholds
+ * are the pass/fail gate, so CI can run this as a quality gate.
  *
- * Run: k6 run load-testing/k6/load.js
- * With output: k6 run --out json=results.json load-testing/k6/load.js
+ * Run: k6 run load-testing/k6/load.js -e BASE_URL=http://localhost:8000
  *
- * Token pool pattern: logins happen once in setup() so the rate limiter
- * (10 req/min per IP) is never hit during the test iterations. 10 users are
- * pre-created with sleep(7) between each login: 9×7s = 63s — the first login
- * expires from the 60-second sliding window before the 10th fires.
- *
- * TODO: this is a worked example against a projects/tasks/comments API. The
- * reusable parts are the PATTERNS — staged VU ramp, per-operation Trend
- * metrics, named thresholds per route, token-pool setup to dodge rate limits.
- * Replace the endpoint paths/payloads in setup()/default()/teardown(), and
- * the threshold names (list_tasks, list_projects, ...), with your own API's.
+ * Patterns kept from the kit template: staged VU ramp, per-operation Trend
+ * metrics, named thresholds per route, and a token pool created once in setup()
+ * so auth isn't in the hot path. (ShopKit has no login rate limit, so the pool
+ * is created without the inter-login sleeps the original needed.)
  */
-import http from "k6/http";
 import { check, group, sleep } from "k6";
+import http from "k6/http";
 import { Rate, Trend } from "k6/metrics";
 
-// Custom per-operation latency trends (ms, percentiles shown in summary).
-const errorRate                 = new Rate("errors");
-const taskCreateDuration        = new Trend("task_create_duration",        true);
-const statusTransitionDuration  = new Trend("status_transition_duration",  true);
-const commentDuration           = new Trend("comment_duration",            true);
-const commentListDuration       = new Trend("comment_list_duration",       true);
+const errorRate = new Rate("errors");
+const searchDuration = new Trend("search_duration", true);
+const addToCartDuration = new Trend("add_to_cart_duration", true);
+const checkoutDuration = new Trend("checkout_duration", true);
 
 export const options = {
-  setupTimeout: "120s",  // 10 users × 7 s = 70 s; allow 50 s headroom
+  setupTimeout: "60s",
   stages: [
-    { duration: "1m", target: 10 },   // ramp up to 10 users
-    { duration: "2m", target: 50 },   // ramp up to 50 users
-    { duration: "5m", target: 50 },   // hold at 50 users
-    { duration: "1m", target: 0 },    // ramp down
+    { duration: "1m", target: 10 }, // ramp to 10
+    { duration: "2m", target: 50 }, // ramp to 50
+    { duration: "5m", target: 50 }, // hold at 50
+    { duration: "1m", target: 0 }, // ramp down
   ],
   thresholds: {
-    // SLOs — fail the test if any threshold is breached.
-    // Calibrated for local Docker at 50 VUs with pool_size=20 connections.
-    // Cloud deployments (managed DB, faster storage) should comfortably beat these.
-    // NOTE: http_req_duration must use an array to apply multiple constraints —
-    //       duplicate JS object keys silently overwrite each other.
-    http_req_failed:            ["rate<0.01"],            // <1% overall error rate (strict)
-    http_req_duration:          ["p(95)<650", "p(99)<1000"],  // overall: p95 < 650 ms, p99 < 1 s
-    "http_req_duration{name:list_tasks}":    ["p(95)<500"],   // indexed FK read
-    "http_req_duration{name:list_projects}": ["p(95)<400"],   // indexed owner_id read (faster, no JOIN)
-    errors:                     ["rate<0.01"],
-    task_create_duration:       ["p(95)<700"],
-    status_transition_duration: ["p(95)<750"],  // 2 DB round-trips (GET + PATCH)
-    comment_duration:           ["p(95)<750"],  // FK insert + task existence check
-    comment_list_duration:      ["p(95)<500"],  // indexed FK read on task_id
+    http_req_failed: ["rate<0.01"], // <1% overall errors
+    http_req_duration: ["p(95)<650", "p(99)<1000"],
+    "http_req_duration{name:list_products}": ["p(95)<400"], // public read
+    "http_req_duration{name:search_products}": ["p(95)<500"], // ILIKE scan
+    "http_req_duration{name:add_to_cart}": ["p(95)<600"],
+    "http_req_duration{name:checkout}": ["p(95)<800"], // multi-row write
+    errors: ["rate<0.01"],
+    search_duration: ["p(95)<500"],
+    add_to_cart_duration: ["p(95)<600"],
+    checkout_duration: ["p(95)<800"],
   },
 };
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:8000";
+const JSON_HEADERS = { "Content-Type": "application/json" };
+const SEARCH_TERMS = ["coffee", "lamp", "backpack", "keyboard", "blanket"];
 
 export function setup() {
-  // Verify both probes before starting the test
-  const health = http.get(`${BASE_URL}/health`);
-  if (health.status !== 200) throw new Error(`Health check failed: ${health.status}`);
-  const ready = http.get(`${BASE_URL}/ready`);
-  if (ready.status !== 200) throw new Error(`Readiness check failed: ${ready.status}`);
+  if (http.get(`${BASE_URL}/health`).status !== 200) throw new Error("health check failed");
+  if (http.get(`${BASE_URL}/ready`).status !== 200) throw new Error("readiness check failed");
 
-  // Pre-create 10 users (≤ rate limit of 10 logins/min) and return their tokens.
-  // All VUs share this pool via round-robin — no login requests in the hot path.
-  // sleep(7) between logins: 9×7s = 63s means login[0] exits the 60-second
-  // sliding window before login[9] fires, staying comfortably under the limit.
+  // Pre-create a token pool (no rate limit on ShopKit auth, so no sleeps needed).
   const tokens = [];
-  const N = 10;
-  for (let i = 0; i < N; i++) {
+  for (let i = 0; i < 10; i++) {
     const email = `load_${Date.now()}_${i}@example.com`;
-    http.post(
-      `${BASE_URL}/auth/register`,
-      JSON.stringify({ email, full_name: "k6 Load User", password: "K6Load123!" }),
-      { headers: { "Content-Type": "application/json" } }
-    );
     const r = http.post(
-      `${BASE_URL}/auth/login`,
-      JSON.stringify({ email, password: "K6Load123!" }),
-      { headers: { "Content-Type": "application/json" } }
+      `${BASE_URL}/auth/register`,
+      JSON.stringify({ email, full_name: "k6 Load", password: "K6Load123!" }),
+      { headers: JSON_HEADERS },
     );
-    if (r.status === 200) tokens.push(r.json("access_token"));
-    if (i < N - 1) sleep(7);  // skip sleep after the last login
+    if (r.status === 201) tokens.push(r.json("access_token"));
   }
-  if (tokens.length === 0) throw new Error("setup: all logins failed");
-  return { tokens };
+  if (tokens.length === 0) throw new Error("setup: all registrations failed");
+
+  // Grab some product ids to add to carts.
+  const list = http.get(`${BASE_URL}/products?page_size=10`);
+  const ids = list.status === 200 ? list.json("items").map((p) => p.id) : [];
+  if (ids.length === 0) throw new Error("setup: no products seeded");
+  return { tokens, ids };
 }
 
-export default function ({ tokens }) {
-  // Rotate through the pre-created token pool — no per-iteration logins.
+export default function ({ tokens, ids }) {
   const token = tokens[(__VU - 1) % tokens.length];
+  const headers = { ...JSON_HEADERS, Authorization: `Bearer ${token}` };
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  group("browse", () => {
+    const list = http.get(`${BASE_URL}/products?page_size=20`, { tags: { name: "list_products" } });
+    check(list, { "list 200": (r) => r.status === 200 });
+    errorRate.add(list.status !== 200);
 
-  group("read_heavy", () => {
-    // List projects (most common operation — read from indexed owner_id column)
-    const projects = http.get(
-      `${BASE_URL}/projects`,
-      { headers, tags: { name: "list_projects" } }
-    );
-    check(projects, { "list projects 200": (r) => r.status === 200 });
-    errorRate.add(projects.status !== 200);
+    const term = SEARCH_TERMS[Math.floor(Math.random() * SEARCH_TERMS.length)];
+    const s0 = Date.now();
+    const search = http.get(`${BASE_URL}/products?q=${term}`, { tags: { name: "search_products" } });
+    searchDuration.add(Date.now() - s0);
+    check(search, { "search 200": (r) => r.status === 200 });
+    errorRate.add(search.status !== 200);
     sleep(0.5);
   });
 
-  group("write_flow", () => {
-    // Create project
-    const proj = http.post(
-      `${BASE_URL}/projects`,
-      JSON.stringify({ name: `Load Project ${Date.now()}` }),
-      { headers, tags: { name: "create_project" } }
+  group("shop", () => {
+    const productId = ids[Math.floor(Math.random() * ids.length)];
+    const a0 = Date.now();
+    const add = http.post(
+      `${BASE_URL}/cart/items`,
+      JSON.stringify({ product_id: productId, quantity: 1 }),
+      { headers, tags: { name: "add_to_cart" } },
     );
-    check(proj, { "create project 201": (r) => r.status === 201 });
-    errorRate.add(proj.status !== 201);
-    if (proj.status !== 201) return;
-    const projectId = proj.json("id");
+    addToCartDuration.add(Date.now() - a0);
+    check(add, { "add to cart 201": (r) => r.status === 201 });
+    errorRate.add(add.status !== 201);
 
-    // Create task (track latency separately for bottleneck analysis)
-    const tcStart = Date.now();
-    const task = http.post(
-      `${BASE_URL}/projects/${projectId}/tasks`,
-      JSON.stringify({ title: `Task ${Date.now()}`, priority: "MEDIUM" }),
-      { headers, tags: { name: "create_task" } }
-    );
-    taskCreateDuration.add(Date.now() - tcStart);
-    check(task, { "create task 201": (r) => r.status === 201 });
-    errorRate.add(task.status !== 201);
-    if (task.status !== 201) return;
-    const taskId = task.json("id");
+    const cart = http.get(`${BASE_URL}/cart`, { headers, tags: { name: "view_cart" } });
+    check(cart, { "view cart 200": (r) => r.status === 200 });
+    errorRate.add(cart.status !== 200);
 
-    // List tasks in that project (exercises FK index on project_id)
-    const list = http.get(
-      `${BASE_URL}/projects/${projectId}/tasks`,
-      { headers, tags: { name: "list_tasks" } }
-    );
-    check(list, { "list tasks 200": (r) => r.status === 200 });
-    errorRate.add(list.status !== 200);
-
-    // Status transition TODO → IN_PROGRESS (2 DB round-trips)
-    const txStart = Date.now();
-    const tx = http.patch(
-      `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
-      JSON.stringify({ status: "IN_PROGRESS" }),
-      { headers, tags: { name: "status_transition" } }
-    );
-    statusTransitionDuration.add(Date.now() - txStart);
-    check(tx, { "transition 200": (r) => r.status === 200 });
-    errorRate.add(tx.status !== 200);
-
-    // Add a comment (exercises comment insert + FK to task)
-    const cmStart = Date.now();
-    const cm = http.post(
-      `${BASE_URL}/projects/${projectId}/tasks/${taskId}/comments`,
-      JSON.stringify({ body: "Load test comment" }),
-      { headers, tags: { name: "add_comment" } }
-    );
-    commentDuration.add(Date.now() - cmStart);
-    check(cm, { "add comment 201": (r) => r.status === 201 });
-    errorRate.add(cm.status !== 201);
-
-    // List comments (FK read on task_id — verifies index under concurrency)
-    const clStart = Date.now();
-    const cl = http.get(
-      `${BASE_URL}/projects/${projectId}/tasks/${taskId}/comments`,
-      { headers, tags: { name: "list_comments" } }
-    );
-    commentListDuration.add(Date.now() - clStart);
-    check(cl, { "list comments 200": (r) => r.status === 200 });
-    errorRate.add(cl.status !== 200);
-
-    // Get single task by ID (exercises individual row lookup — realistic for
-    // detail-view reads that happen alongside list requests)
-    const getTask = http.get(
-      `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
-      { headers, tags: { name: "get_task" } }
-    );
-    check(getTask, { "get task 200": (r) => r.status === 200 });
-    errorRate.add(getTask.status !== 200);
-
-    // Cancel ~10% of tasks to exercise the CANCEL branch (mirrors Locust behaviour).
-    // The remaining 90% advance through IN_REVIEW → DONE on 1-in-3 iterations.
-    if (Math.random() < 0.10) {
-      const rc = http.patch(
-        `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
-        JSON.stringify({ status: "CANCELLED" }),
-        { headers, tags: { name: "cancel_transition" } }
-      );
-      check(rc, { "cancel transition 200": (r) => r.status === 200 });
-      errorRate.add(rc.status !== 200);
-    } else if (__ITER % 3 === 0) {
-      // Full state machine: IN_PROGRESS → IN_REVIEW → DONE
-      const r1 = http.patch(
-        `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
-        JSON.stringify({ status: "IN_REVIEW" }),
-        { headers, tags: { name: "status_transition" } }
-      );
-      check(r1, { "in_review transition 200": (r) => r.status === 200 });
-      errorRate.add(r1.status !== 200);
-
-      if (r1.status === 200) {
-        const r2 = http.patch(
-          `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
-          JSON.stringify({ status: "DONE" }),
-          { headers, tags: { name: "status_transition" } }
-        );
-        check(r2, { "done transition 200": (r) => r.status === 200 });
-        errorRate.add(r2.status !== 200);
-      }
+    // ~20% of iterations check out (empties the cart).
+    if (Math.random() < 0.2) {
+      const c0 = Date.now();
+      const co = http.post(`${BASE_URL}/checkout`, null, { headers, tags: { name: "checkout" } });
+      checkoutDuration.add(Date.now() - c0);
+      check(co, { "checkout 201": (r) => r.status === 201 });
+      errorRate.add(co.status !== 201);
     }
-
     sleep(1);
   });
 
-  sleep(Math.random() * 2);  // variable think time 0–2 s between iterations
+  sleep(Math.random() * 2);
 }
 
-// teardown() runs once after all VUs finish — revoke all pre-created tokens.
 export function teardown({ tokens }) {
   for (const token of tokens) {
-    http.post(
-      `${BASE_URL}/auth/logout`,
-      null,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    http.post(`${BASE_URL}/auth/logout`, null, { headers: { Authorization: `Bearer ${token}` } });
   }
 }

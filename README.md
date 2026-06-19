@@ -101,9 +101,11 @@ You've completed the capstone when your repo meets the bar in
 **[RUBRIC.md](RUBRIC.md)** — at minimum: `doctor.py` reports zero FAILs, CI is
 green, your dashboards show real traffic from your own app, a load test passes
 its thresholds, you've recorded security findings, `terraform plan` is clean,
-and the migration-safety gate is wired. **[KIT-VERIFICATION.md](KIT-VERIFICATION.md)**
-maps every kit capability to the module that exercises it and the objective
-signal that proves it works.
+and the migration-safety gate is wired. A central habit is the **testing
+discipline** — you build all six test types (unit, integration, e2e, security,
+load, pen) mapped to the lifecycle; see **[docs/TESTING-STRATEGY.md](docs/TESTING-STRATEGY.md)**.
+**[KIT-VERIFICATION.md](KIT-VERIFICATION.md)** maps every kit capability to the
+module that exercises it and the objective signal that proves it works.
 
 ---
 
