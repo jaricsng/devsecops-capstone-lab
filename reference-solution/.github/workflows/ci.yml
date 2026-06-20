@@ -198,7 +198,7 @@ jobs:
       - name: Check migrations
         run: |
           if [ -f tools/check_migrations.py ]; then
-            python3 tools/check_migrations.py
+            python3 tools/check_migrations.py backend/alembic/versions
           else
             echo "tools/check_migrations.py not found — skipping. Re-scaffold with tools/scaffold.py to get it."
           fi
