@@ -1,5 +1,7 @@
 # DevSecOps Capstone Lab
 
+![DevSecOps Capstone — from an empty repo to secured, observable, tested, deploy-ready](docs/assets/social-card.png)
+
 A hands-on capstone built around the
 [`platform-starter-kit`](https://github.com/jaricsng/platform-starter-kit) — a
 public library of DevSecOps platform assets (CI/CD, observability, IaC,
