@@ -15,6 +15,12 @@ To prove the path works, this repo ships a complete worked example:
 app (FastAPI + React + Postgres + Stripe sandbox) built on the kit's golden
 path. Use it as an answer key, not a thing to copy wholesale.
 
+> `reference-solution/` is a **git submodule** pointing at the standalone
+> [`jaricsng/shopkit`](https://github.com/jaricsng/shopkit) repo (single source
+> of truth — its CI is the live proof these pieces work). Clone with
+> `git clone --recurse-submodules …`, or run `git submodule update --init`
+> after a plain clone, to populate it.
+
 ---
 
 ## Who this is for

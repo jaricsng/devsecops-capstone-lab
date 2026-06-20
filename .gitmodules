@@ -1,0 +1,3 @@
+[submodule "reference-solution"]
+	path = reference-solution
+	url = https://github.com/jaricsng/shopkit
