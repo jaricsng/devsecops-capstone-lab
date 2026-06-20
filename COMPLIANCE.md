@@ -25,7 +25,7 @@ process**; a repo can supply the first and some of the second, never the third.
 | DAST / penetration testing | [Module 06](modules/06-security-pentest.md): `manual-checks.sh` (authz/IDOR), ZAP baseline, STRIDE in `SECURITY-FINDINGS.md` | CC4.1 | A.8.29 | 18 |
 | Policy-as-code / config governance | [Module 07](modules/07-iac-governance.md): Conftest/OPA over Terraform plans; tfsec | CC7.1 | A.8.9 | 4 |
 | Change safety for data (zero-downtime migrations) | `check_migrations.py` expand/contract gate | CC8.1 | A.8.32 | — |
-| Container / image security | Trivy scan in `publish.yml` (build/release path) | CC7.1 | A.8.8 | 16 |
+| Container / image security | Trivy on PRs (`docker-build`) **and** at release (`publish.yml`), HIGH/CRITICAL gate | CC7.1 | A.8.8 | 16 |
 | Software provenance / integrity | SBOM (CycloneDX) + SLSA provenance + cosign signing in `publish.yml` | CC7.1 | A.8.30 | 7 |
 | IaC review & drift detection | `terraform validate`/`plan`, `drift-detection.yml` | CC7.1 | A.8.9 | 4 |
 | Data-subject deletion (privacy) | `DELETE /users/me` + token invalidation (GDPR Art. 17 shape) | C1.1 | A.5.34 | — |
@@ -60,9 +60,10 @@ for **process and evidence** that a repo cannot produce on its own:
 | SBOM (CycloneDX) | ✅ generated in `publish.yml` at build | Publish/attest the SBOM with each release |
 | SLSA provenance + signing | ✅ in `publish.yml` (cosign) | Verify signatures at deploy admission |
 | Frontend lockfile | ✅ `package-lock.json` (CI uses `npm ci`) | — |
-| **Backend lockfile** | ⚠️ pyproject uses min-version specifiers (cross-version by design) | For prod, pin with `pip-compile`/`uv lock` → a hash-locked `requirements.txt` and install with `--require-hashes` |
-| **Dependency license scanning** | ❌ not run | Add `pip-licenses` / `license-checker` (or Syft+Grype) to the CI `security` job and gate on disallowed licenses |
-| Image scanning on PRs | ⚠️ Trivy runs at release (`publish.yml`), not on PRs | Add a Trivy step to the PR `docker-build` job to catch CVEs pre-merge |
+| **Backend lockfile** | ✅ hash-pinned `requirements.txt` (`pip-compile --generate-hashes`); Dockerfile installs `--require-hashes` then the app `--no-deps` | — |
+| **Dependency license scanning** | ✅ CI `security` job: `pip-licenses` (fail on GPL/AGPL; LGPL/MPL allowed) + `license-checker` (production deps permissive) | — |
+| Image scanning on PRs | ✅ Trivy in the PR `docker-build` job (HIGH/CRITICAL, ignore-unfixed) — caught & fixed 31 CVEs in the frontend base | — |
+| Action pinning | ✅ third-party actions (e.g. `trivy-action`) pinned to commit SHA | Renovate/Dependabot keeps SHAs current |
 
 ## How to demonstrate it
 
