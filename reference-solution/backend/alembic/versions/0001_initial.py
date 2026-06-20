@@ -79,8 +79,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("order_items")
-    op.drop_table("orders")
-    op.drop_table("cart_items")
-    op.drop_table("products")
-    op.drop_table("users")
+    # These drops reverse the baseline create. check_migrations.py flags any
+    # drop_table (it can't tell upgrade from downgrade), so we acknowledge them:
+    # a downgrade never runs in a forward rolling deploy, so it's not the
+    # backward-incompatibility the gate guards against.
+    op.drop_table("order_items")  # migration-safety: ack baseline downgrade (reverses create)
+    op.drop_table("orders")  # migration-safety: ack baseline downgrade (reverses create)
+    op.drop_table("cart_items")  # migration-safety: ack baseline downgrade (reverses create)
+    op.drop_table("products")  # migration-safety: ack baseline downgrade (reverses create)
+    op.drop_table("users")  # migration-safety: ack baseline downgrade (reverses create)

@@ -89,4 +89,3 @@ repos:
         language: system
         pass_filenames: false
         files: (migrations/|alembic/versions/|db/migrate/|prisma/migrations/)
-

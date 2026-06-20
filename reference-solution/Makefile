@@ -14,14 +14,16 @@ COMPOSE := docker compose
 #   make sync KIT_PATH=/path/to/platform-starter-kit
 KIT_PATH ?= ../platform-starter-kit
 
-.PHONY: help setup run up down test lint fmt scan doctor migrations policy obs-up obs-down sync
+.PHONY: help setup run up down test test-integration lint fmt scan doctor migrations policy obs-up obs-down sync
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-setup: ## Install dependencies + git hooks (fill in your stack's installs)
-	# TODO: e.g. `pip install -e ".[dev]"` or `npm ci` — see docs/TECH-STACK-SWAP-GUIDE.md
+setup: ## Install dependencies + git hooks (backend venv + frontend npm + pre-commit)
+	python3 -m venv backend/.venv
+	backend/.venv/bin/pip install -e "./backend[dev]"
+	cd frontend && npm ci
 	@command -v detect-secrets >/dev/null 2>&1 && { [ -f .secrets.baseline ] || detect-secrets scan > .secrets.baseline; } || true
 	@command -v pre-commit >/dev/null 2>&1 && pre-commit install || echo "pre-commit not installed — skipping hook install"
 
@@ -33,16 +35,20 @@ up: ## Start the app stack locally
 down: ## Stop the app stack
 	$(COMPOSE) down
 
-test: ## Run the test suite (fill in your stack's test command)
-	# TODO: e.g. `pytest` or `npm test`
-	@echo "Set the test command in the Makefile's 'test' target."
+test: ## Run the test suite (backend unit pytest + frontend vitest)
+	cd backend && .venv/bin/pytest
+	cd frontend && npm test
 
-lint: ## Run linters (fill in, or rely on pre-commit)
-	@command -v pre-commit >/dev/null 2>&1 && pre-commit run --all-files || echo "TODO: set your linter command"
+test-integration: ## Run backend integration tests (needs Postgres: make up)
+	cd backend && DATABASE_URL=postgresql+psycopg://shopkit:shopkit@localhost:5432/shopkit .venv/bin/pytest -m integration
 
-fmt: ## Auto-format the codebase (fill in your formatter)
-	# TODO: e.g. `ruff format . && isort .` or `prettier --write .`
-	@echo "Set the formatter command in the Makefile's 'fmt' target."
+lint: ## Run linters (backend ruff/black/isort + frontend eslint)
+	cd backend && .venv/bin/ruff check . && .venv/bin/black --check . && .venv/bin/isort --check .
+	cd frontend && npm run lint
+
+fmt: ## Auto-format (backend ruff --fix + isort + black; frontend eslint --fix)
+	cd backend && .venv/bin/ruff check --fix . && .venv/bin/isort . && .venv/bin/black .
+	cd frontend && npx eslint . --fix
 
 scan: ## Run local security scans (uses security/ scripts if present)
 	@if [ -f security/manual-checks.sh ]; then bash security/manual-checks.sh; \
@@ -52,7 +58,7 @@ doctor: ## Readiness check against this repo (tools/doctor.py)
 	@python3 tools/doctor.py .
 
 migrations: ## Check DB migrations for backward-incompatible changes
-	@python3 tools/check_migrations.py
+	@python3 tools/check_migrations.py backend/alembic/versions
 
 policy: ## Run policy-as-code against a Terraform plan (needs conftest + a plan.json)
 	@if [ -d governance/policy-as-code ]; then \
