@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     # Postgres at runtime; tests override this with SQLite.
     database_url: str = "postgresql+psycopg://shopkit:shopkit@localhost:5432/shopkit"
 
-    # Auth
-    secret_key: str = "dev-only-change-me"  # nosec B105 - dev default, overridden in real envs
+    # Auth — dev-only default; overridden via SECRET_KEY in every real env.
+    secret_key: str = "dev-only-change-me"  # nosec B105
     access_token_ttl_minutes: int = 60
     jwt_algorithm: str = "HS256"
 

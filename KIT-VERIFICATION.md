@@ -86,7 +86,7 @@ Recorded while building the reference solution against the kit.
 | **Unit** (frontend) | `vitest run` | ✅ **3 passed** |
 | **Integration** (real Postgres) | `pytest -m integration` (throwaway PG container) | ✅ **3 passed** — alembic migrations applied, unique constraint + real SQL exercised; default run deselects them |
 | **E2E** (Playwright) | `npx playwright test` vs the `frontend` compose service | ✅ **2 passed** — browser drives register→add-to-cart→checkout through nginx→API→Postgres |
-| **Security** (lint/SAST) | `ruff` / `black --check` / `isort --check` | ✅ all clean (bandit/detect-secrets/pip-audit wired in pre-commit/CI) |
+| **Security** (lint/SAST/deps) | `ruff`/`black`/`isort`; **`bandit -r app`**; **`pip-audit`**; **`npm audit --audit-level=high`** | ✅ all clean — bandit 0 issues, pip-audit 0 CVEs, npm audit **0** (after bumping vitest→v3 to clear an esbuild/vite dev-tooling CVE chain that was 3 moderate/1 high/2 critical) |
 | **Pen / DAST** | `security/manual-checks.sh` vs live ShopKit | ✅ **18 PASS, 7 WARN, 0 FAIL** — authz/IDOR/injection/business-logic all hold; WARNs = accepted defence-in-depth gaps |
 | Frontend gates | `tsc -b` / `eslint .` / `vite build` | ✅ typecheck, lint, build all pass |
 | Full stack | `docker compose up --build` | ✅ DB→migrate→seed(5)→uvicorn→frontend; register→cart→checkout (order $84.00) |
