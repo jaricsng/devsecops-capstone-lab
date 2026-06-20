@@ -11,6 +11,17 @@ locals {
 }
 
 # ── Cloud SQL (PostgreSQL 16) ──────────────────────────────────────────────────
+# Two tfsec findings on this instance are accepted with justification:
+#  - encrypt-in-transit: TLS *is* enforced via settings.ip_configuration.ssl_mode
+#    = "ENCRYPTED_ONLY" (google provider v6+ removed require_ssl); tfsec is EOL
+#    and doesn't recognize ssl_mode, so it mis-flags the control.
+#  - no-public-access: this teaching reference uses a public IP reached only via
+#    the Cloud SQL Auth Proxy (IAM-authenticated, TLS-enforced). PRODUCTION should
+#    switch to a private IP + Serverless VPC Access connector (no public address)
+#    — see operations/ and docs/TECH-STACK-SWAP-GUIDE.md.
+# (The ignore directives must sit on consecutive lines directly above the block.)
+#tfsec:ignore:google-sql-encrypt-in-transit-data
+#tfsec:ignore:google-sql-no-public-access
 resource "google_sql_database_instance" "main" {
   name                = "${local.name_prefix}-db"
   database_version    = "POSTGRES_16"
@@ -19,6 +30,12 @@ resource "google_sql_database_instance" "main" {
 
   settings {
     tier = var.db_tier
+
+    ip_configuration {
+      # Require TLS for every connection. google provider v6+ uses ssl_mode
+      # (the deprecated require_ssl was removed).
+      ssl_mode = "ENCRYPTED_ONLY"
+    }
 
     backup_configuration {
       enabled                        = true
@@ -33,9 +50,34 @@ resource "google_sql_database_instance" "main" {
       hour = 3 # 03:00 UTC — low traffic window
     }
 
+    # Postgres diagnostic logging (tfsec google-sql-pg-log-* / CIS). These are
+    # operational signals, not query contents.
     database_flags {
+      name  = "log_connections"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_disconnections"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_lock_waits"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_checkpoints"
+      value = "on"
+    }
+    database_flags {
+      name  = "log_temp_files"
+      value = "0" # 0 = log all temp files
+    }
+    database_flags {
+      # -1 DISABLES statement-content logging (it can capture sensitive data in
+      # plaintext logs — tfsec google-sql-pg-no-min-statement-logging). Use
+      # Cloud SQL Query Insights for slow-query analysis instead.
       name  = "log_min_duration_statement"
-      value = "1000" # log queries taking > 1 s
+      value = "-1"
     }
 
     user_labels = local.labels

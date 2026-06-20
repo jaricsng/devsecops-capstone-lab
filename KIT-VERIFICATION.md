@@ -92,9 +92,10 @@ Recorded while building the reference solution against the kit.
 | Full stack | `docker compose up --build` | ✅ DB→migrate→seed(5)→uvicorn→frontend; register→cart→checkout (order $84.00) |
 | `check_migrations.py` | `unsafe.sql` / `safe.sql` | ✅ exit 1 (blocked) / exit 0 (allowed) |
 | `conftest` (governance) | passing / failing fixtures | ✅ exit 0 (1 warn) / exit 1 (2 failures) |
-| `terraform` (IaC) | — | ⏭️ not run (terraform not installed here); tfvars wired (`shopkit`) |
+| **IaC** (`terraform`) | `terraform init -backend=false` + `validate` + `fmt -check` | ✅ "Success! The configuration is valid"; fmt clean. (`plan`/`apply` still need GCP creds.) |
+| **IaC security** (`tfsec`) | `tfsec .` on the Cloud SQL module | ✅ **No problems detected** — fixed 6 Postgres logging findings + enforced TLS (`ssl_mode=ENCRYPTED_ONLY`); 2 HIGH justified-ignored with reasons (tfsec is EOL & doesn't know `ssl_mode`; public-IP is a documented teaching tradeoff vs prod private-IP) |
 | **Load** (k6) | `k6 run smoke.js` + `load.js` (15 VUs) vs live ShopKit | ✅ **executed** — smoke: 468 checks 100%, p95 9.9ms, 0% errors; load: 524 checks 100%, every per-route threshold pass (list<400, search<500, cart<600, checkout<800), 0% errors. (`spike.js`/Locust share the same routes; syntax-validated.) |
-| **pre-commit** | `pre-commit run --all-files` (reference temp-repo) | ✅ all app hooks pass (detect-secrets after baseline refresh — also **catches a planted AWS key**; bandit, black, isort, ruff, check-migrations, file hooks). terraform_fmt/validate need the terraform binary; tfsec ran and flagged 8 hardening findings on the example IaC module (Module-07 work). |
+| **pre-commit** | `pre-commit run --all-files` (reference temp-repo) | ✅ **all 16 hooks pass (exit 0)** — detect-secrets (also **catches a planted AWS key**), bandit, black, isort, ruff, check-migrations, file hooks, **and terraform_fmt / terraform_validate / terraform_tfsec** (after the IaC hardening above + terraform installed) |
 | **Makefile** | `make help/lint/test/migrations` | ✅ wired to ShopKit (backend pytest+lint, frontend vitest+eslint, `make migrations` → backend/alembic) |
 | **Frontend coverage gate** | `vitest run --coverage` thresholds | ✅ enforced (~40% lines / 57% funcs / 65% branches); pages covered by e2e. 13 unit tests. |
 | `check_migrations.py` (reference's own migration) | `tools/check_migrations.py backend/alembic/versions` | ✅ exit 0 (baseline downgrade drops acknowledged via `migration-safety: ack`) |
