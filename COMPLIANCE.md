@@ -20,6 +20,7 @@ process**; a repo can supply the first and some of the second, never the third.
 | Vulnerability disclosure | `SECURITY.md` (private reporting) | CC2.3 | A.5.5 | — |
 | Logging & monitoring (observability) | [Module 04](modules/04-observability.md): OTel traces/metrics, Prometheus, Grafana, Alertmanager | CC7.2 | A.8.15, A.8.16 | 8 |
 | SLOs / availability monitoring | `operations/SLOs.md` + recording rules + burn-rate alerts | A1.1 | A.8.6 | — |
+| Security audit logging | `backend/app/audit.py` — structured events (auth, profile, account-delete, admin, checkout) | CC7.2 | A.8.15 | 8 |
 | Incident response & post-mortems | `operations/runbooks/` (incident-response, rollback, postmortem) | CC7.3, CC7.4 | A.5.24–A.5.27 | 17 |
 | Secure SDLC test discipline | [docs/TESTING-STRATEGY.md](docs/TESTING-STRATEGY.md): unit/integration/e2e/security/load/pen, gated in CI | CC8.1 | A.8.25, A.8.29 | 16 |
 | DAST / penetration testing | [Module 06](modules/06-security-pentest.md): `manual-checks.sh` (authz/IDOR), ZAP baseline, STRIDE in `SECURITY-FINDINGS.md` | CC4.1 | A.8.29 | 18 |
@@ -31,27 +32,28 @@ process**; a repo can supply the first and some of the second, never the third.
 | Data-subject deletion (privacy) | `DELETE /users/me` + token invalidation (GDPR Art. 17 shape) | C1.1 | A.5.34 | — |
 | CI reproducibility / pinned toolchain | `.tool-versions`, devcontainer, lockfiles (`package-lock.json`) | CC8.1 | A.8.31 | 2 |
 
-## What the capstone does **not** cover (your org must add)
+## The organizational controls (process + evidence)
 
-Technical controls are necessary but not sufficient. An auditor will also ask
-for **process and evidence** that a repo cannot produce on its own:
+Technical controls are necessary but not sufficient — an auditor also wants
+**process and evidence** a repo can't produce on its own. The **[governance/](governance/)
+pack now provides an adopt-ready template for each**; what remains is for your
+org to fill the `TODO`s and *operate* them on a cadence (the part no artifact can do).
 
-- **Access management & reviews** — IdP/SSO, least-privilege RBAC, periodic
-  access recertification, joiner/mover/leaver. *(SOC 2 CC6.1–CC6.3, ISO A.5.15–A.5.18)*
-- **Data classification & retention** — classify PII/order data, retention &
-  deletion schedules, encryption-at-rest key management (CMEK). *(ISO A.5.12, A.8.10–A.8.12)*
-- **Audit-log retention & review** — ship logs to a tamper-evident store with a
-  defined retention period and review cadence (the capstone *emits* telemetry;
-  it doesn't *retain/review* it). *(SOC 2 CC7.2, ISO A.8.15)*
-- **Risk assessment & vendor/3rd-party risk** — register, risk-rank, review
-  subprocessors. *(SOC 2 CC3.x, ISO A.5.19–A.5.23)*
-- **BCP / DR** — backups are configured in IaC, but you need tested RTO/RPO and
-  DR runbooks exercised on a schedule. *(SOC 2 A1.2, ISO A.5.29–A.5.30)*
-- **Security awareness training**, **HR security**, **physical security**. *(ISO A.6.x)*
-- **Independent penetration test** — Module 06 teaches self-testing; compliance
-  typically wants a periodic **third-party** test. *(SOC 2 CC4.1)*
-- **Formal policies & evidence** — written InfoSec policy set, and the *evidence*
-  (tickets, approvals, logs) that controls operated over the audit period.
+| Control | Template | Still requires (you) |
+|---------|----------|----------------------|
+| Access management & reviews *(SOC 2 CC6.1–6.3, ISO A.5.15–18)* | [governance/access-control.md](governance/access-control.md) | IdP/SSO+MFA, run the quarterly review |
+| Data classification & retention *(ISO A.5.12, A.8.10–12, A.5.34)* | [governance/data-governance.md](governance/data-governance.md) | Set retention values; CMEK; DSAR/export process |
+| **Audit-log retention & review** *(CC7.2, ISO A.8.15)* | ✅ **emission now in code** (`backend/app/audit.py`) + [assurance-and-training.md](governance/assurance-and-training.md) | Ship to a tamper-evident store; retention; periodic review |
+| Risk assessment *(CC3.x, ISO A.5.7)* | [governance/risk-register.md](governance/risk-register.md) | Score, treat, review quarterly |
+| Vendor / 3rd-party risk *(CC9.2, ISO A.5.19–23)* | [governance/third-party-register.md](governance/third-party-register.md) | DPAs; vendor reviews |
+| BCP / DR *(A1.2, ISO A.5.29–30)* | [governance/business-continuity-dr.md](governance/business-continuity-dr.md) | Set RTO/RPO; **test** restore on a schedule |
+| Incident & breach response *(CC7.3–7.5, ISO A.5.24–27)* | [governance/incident-and-breach-response.md](governance/incident-and-breach-response.md) + `operations/runbooks/` | Run tabletops; maintain contacts |
+| Independent penetration test *(CC4.1)* | [governance/assurance-and-training.md](governance/assurance-and-training.md) | Engage a 3rd-party firm annually |
+| Security awareness training *(ISO A.6.3)* | [governance/assurance-and-training.md](governance/assurance-and-training.md) | Deliver + record completion |
+| Formal policies & evidence | the whole [governance/](governance/) pack + [audit-readiness checklist](governance/assurance-and-training.md) | Approve policies; retain evidence over the period |
+
+> HR security and physical security *(ISO A.6.x, A.7.x)* are wholly
+> organizational and out of scope for a software capstone — note them in your ISMS.
 
 ## Supply-chain hardening — status & recommendations
 

@@ -112,9 +112,12 @@ discipline** — you build all six test types (unit, integration, e2e, security,
 load, pen) mapped to the lifecycle; see **[docs/TESTING-STRATEGY.md](docs/TESTING-STRATEGY.md)**.
 **[KIT-VERIFICATION.md](KIT-VERIFICATION.md)** maps every kit capability to the
 module that exercises it and the objective signal that proves it works, and
-**[COMPLIANCE.md](COMPLIANCE.md)** maps the controls to SOC 2 / ISO 27001 / CIS —
-and is honest about what an organization must still add (access reviews, data
-retention, audit-log retention, third-party pen-tests, formal policies).
+**[COMPLIANCE.md](COMPLIANCE.md)** maps the controls to SOC 2 / ISO 27001 / CIS,
+with the **[governance/](governance/) pack** providing adopt-ready templates for
+the organizational controls (data governance, access reviews, risk & vendor
+registers, BCP/DR, incident & breach response, pen-test policy, training, and an
+audit-evidence checklist) — and is honest that *operating* them on a cadence is
+the org's job, not the repo's.
 
 ---
 
