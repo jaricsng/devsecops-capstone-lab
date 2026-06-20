@@ -111,7 +111,10 @@ and the migration-safety gate is wired. A central habit is the **testing
 discipline** — you build all six test types (unit, integration, e2e, security,
 load, pen) mapped to the lifecycle; see **[docs/TESTING-STRATEGY.md](docs/TESTING-STRATEGY.md)**.
 **[KIT-VERIFICATION.md](KIT-VERIFICATION.md)** maps every kit capability to the
-module that exercises it and the objective signal that proves it works.
+module that exercises it and the objective signal that proves it works, and
+**[COMPLIANCE.md](COMPLIANCE.md)** maps the controls to SOC 2 / ISO 27001 / CIS —
+and is honest about what an organization must still add (access reviews, data
+retention, audit-log retention, third-party pen-tests, formal policies).
 
 ---
 
