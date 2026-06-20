@@ -31,9 +31,26 @@ not having it.
   checklist tells you what evidence to retain and where it already comes from
   (CI logs, PR history, this pack).
 
+## Cadence automation (so the reviews actually happen)
+
+A policy that says "review quarterly" only counts if the review happens on time
+and is recorded. The reference automates the **prompting, tracking, and the
+parts that *can* be automated** via scheduled GitHub Actions (in
+`../reference-solution/.github/workflows/`):
+
+| Workflow | Does | Cadence |
+|----------|------|---------|
+| `compliance-calendar.yml` | Auto-opens a tracked **review issue** (from `.github/compliance/` checklists) for access/risk/vendor/DR/training/pen-test. The closed issue = evidence. | quarterly + annual (+ manual) |
+| `dr-restore-test.yml` | **Rebuilds** the stack from code+migrations and checks time-to-ready vs an RTO budget | monthly (+ manual) |
+| `compliance-evidence.yml` | Snapshots audits/licenses/SAST/SBOMs into a **retained artifact** | monthly (+ manual) |
+
+What stays human: the **judgment/sign-off inside each issue**, a **real backup
+restore**, and the **independent pen-test** — the workflow opens the issue and
+times the rebuild, but a person still decides and attests.
+
 ## The honest boundary
 
-A capstone (and this pack) gets you **controls + templates + some evidence**.
-Certification (SOC 2 Type II, ISO 27001) additionally requires an **independent
-auditor** to confirm the controls **operated effectively over a period** — which
-is people and time, not a repository.
+A capstone (and this pack) gets you **controls + templates + automated cadence +
+evidence**. Certification (SOC 2 Type II, ISO 27001) additionally requires an
+**independent auditor** to confirm the controls **operated effectively over a
+period** — which is people and time, not a repository.
